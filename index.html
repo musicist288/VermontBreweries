@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Simple Map</title>
+        <meta name="viewport" content="initial-scale=1.0">
+        <meta charset="utf-8">
+        <style>
+         html, body {
+             height: 100%;
+             margin: 0;
+             padding: 0;
+         }
+         #map {
+             height: 100%;
+         }
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
+        <script>
+         var API_KEY = 'AIzaSyCOUZLy4aSDO-gmBueW23OI-8nl-YOwpvY';
+         function getLocations() {
+             var xhr = new XMLHttpRequest();
+             xhr.open("GET", "brewerylist.csv");
+             return new Promise((resolve, reject) => {
+                 xhr.onreadystatechange = function () {
+                     if (xhr.readyState === 4) {
+                         var csv = xhr.responseText;
+                         var rows = csv.split('\n');
+                         var result = [];
+                         rows.slice(1).forEach((row) => {
+                             var index = row.indexOf(',');
+                             result.push([
+                                 row.substr(0, index),
+                                 row.substr(index + 1, row.length)
+                             ]);
+                         });
+
+                         resolve(result);
+                     }
+                 };
+
+                 xhr.send();
+             });
+         }
+
+         function getLatLng(title, address) {
+             var xhr = new XMLHttpRequest();
+             var query = "address=" + encodeURIComponent(title + "," + address);
+             query += "&key=" + API_KEY;
+             xhr.open("GET", "https://maps.googleapis.com/maps/api/geocode/json?" + query);
+             xhr.setRequestHeader("Accept", "application/json");
+             return new Promise((resolve, reject) => {
+                 xhr.onreadystatechange = function () {
+                     if (xhr.readyState === 4) {
+                         var data = JSON.parse(xhr.responseText);
+                         if (!data.results[0]) {
+                             return resolve({});
+                         }
+                         resolve(data.results[0].geometry.location);
+                     }
+                 };
+
+                 xhr.send();
+             });
+         }
+
+         function initMap() {
+             var map = new google.maps.Map(document.querySelector('#map'), {
+                 zoom: 8,
+                 center: new google.maps.LatLng(43.7754527,-72.3314808)
+             });
+
+             var breweries = [];
+             getLocations().then((locations) => {
+                 breweries = locations;
+                 return Promise.all(locations.map(l => getLatLng.apply(null, l)));
+             }).then((points) => {
+                 breweries.forEach((brew, i) => {
+                     var loc = points[i];
+                     var title = brew[0];
+                     if (!loc.lat) return;
+                     new google.maps.Marker({
+                         position: loc,
+                         map: map,
+                         title: title
+                     });
+                 });
+             });
+         }
+        </script>
+
+
+        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCOUZLy4aSDO-gmBueW23OI-8nl-YOwpvY&callback=initMap" async defer></script>
+    </body>
+</html>
